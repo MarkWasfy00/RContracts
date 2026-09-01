@@ -54,6 +54,72 @@ To develop inside containers instead (Vite on :3000 with hot reload, API on
 :4000), use `docker compose -f compose.dev.yaml up`. Running `npm run dev` on
 the host is faster if you have Node installed.
 
+# Deploying
+
+Pushing to `master` builds the image, pushes it to GHCR, and restarts the
+container on the server — see `.github/workflows/deploy.yml`. You can also
+run it by hand from the repository's **Actions** tab. The server only pulls;
+it never builds.
+
+## One-time setup
+
+Add these under **Settings → Secrets and variables → Actions**:
+
+| Secret | | |
+| --- | --- | --- |
+| `SSH_HOST` | required | server hostname or IP |
+| `SSH_USER` | required | user to log in as; must be able to run `docker` |
+| `SSH_PASSWORD` | required | that user's SSH password |
+| `SSH_PORT` | optional | defaults to `22` |
+| `DEPLOY_PATH` | optional | defaults to `/srv/rg` |
+
+Then, on the server, create the deploy directory and its `.env`:
+
+```bash
+sudo mkdir -p /srv/rg && sudo chown "$USER" /srv/rg
+cd /srv/rg
+printf 'ADMIN_TOKEN=%s\n' "$(node -e 'console.log(crypto.randomUUID())')" > .env
+```
+
+`compose.prod.yaml` is copied there by the workflow, so there is nothing else
+to put on the server. The `.env` is yours and deploys never touch it — set
+`HOST_PORT` and `CORS_ORIGIN` there too if the defaults don't fit.
+
+The first deploy also creates a `production` environment in the repository;
+if you want a manual approval gate before anything reaches the server, add a
+required reviewer to it under **Settings → Environments**.
+
+## What a deploy does
+
+1. Builds the image and pushes it as `ghcr.io/markwasfy00/rcontracts`, tagged
+   both `:latest` and `:<short-sha>`.
+2. SSHes in, logs in to GHCR with a token that expires when the job ends,
+   pulls the commit-pinned tag, and runs `docker compose up -d`.
+3. Waits up to five minutes for the container's healthcheck to pass, and
+   prints the last 50 log lines if it doesn't.
+
+Content lives in the `rg-data` volume, so deploys never reset the site.
+
+**To roll back**, re-run the workflow from the older commit — the Actions run
+for that commit deploys the image tagged with its SHA, which is still in the
+registry.
+
+If the package is private, the server needs no stored registry credentials —
+the workflow logs in and out around each pull.
+
+## A note on password auth
+
+The deploy logs in with `SSH_PASSWORD` via `sshpass`, so the server needs
+`PasswordAuthentication yes` in `/etc/ssh/sshd_config`. That means your real
+server password sits in GitHub and is accepted from anywhere — a deploy key
+would be narrower and revocable on its own. To switch later:
+
+1. `ssh-keygen -t ed25519 -C "github-actions-deploy" -f ~/.ssh/rg_deploy -N ""`
+2. Append `rg_deploy.pub` to `~/.ssh/authorized_keys` on the server.
+3. Replace the `SSH_PASSWORD` secret with the private key as `SSH_KEY`, and in
+   `deploy.yml` write it to `~/.ssh/id_deploy` instead of installing sshpass,
+   point `IdentityFile` at it, and drop the `sshpass -e` prefixes.
+
 ## Styling
 
 This project uses [Tailwind CSS](https://tailwindcss.com/) for styling.

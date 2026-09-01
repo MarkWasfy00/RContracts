@@ -1,0 +1,159 @@
+name: Deploy
+
+# Builds the production image, pushes it to GHCR, then tells the server to
+# pull it and restart. The server never builds anything itself.
+#
+# Required repository secrets:
+#   SSH_HOST      hostname or IP of the server
+#   SSH_USER      user to log in as (must be able to run docker)
+#   SSH_PASSWORD  that user's SSH password
+# Optional:
+#   SSH_PORT      defaults to 22
+#   DEPLOY_PATH   where compose.prod.yaml and .env live, defaults to /srv/rg
+#
+# The server must have `PasswordAuthentication yes` in sshd_config. Switching
+# to a key later means replacing SSH_PASSWORD with the private key and
+# dropping the sshpass calls below.
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+concurrency:
+  # A newer deploy makes an in-flight one pointless, but never interrupt one
+  # halfway through restarting the server.
+  group: deploy
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image: ${{ steps.meta.outputs.image }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Work out the image name
+        id: meta
+        run: |
+          # GHCR only accepts lowercase names; the repo name is mixed case.
+          name="${REGISTRY}/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')"
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+          echo "image=$name:${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ steps.meta.outputs.name }}:latest
+            ${{ steps.meta.outputs.image }}
+          # Layer cache lives in the Actions cache, so unchanged deps aren't
+          # reinstalled on every run.
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    environment: production
+    # sshpass reads the password from this variable rather than the command
+    # line, where it would show up in the process list on the runner.
+    env:
+      SSHPASS: ${{ secrets.SSH_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up the SSH connection
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_PORT: ${{ secrets.SSH_PORT || '22' }}
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq sshpass
+
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          # Trust on first use: pin whatever the host presents now so the
+          # rest of the job fails loudly if it changes mid-deploy.
+          ssh-keyscan -p "$SSH_PORT" -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          cat >> ~/.ssh/config <<EOF
+          Host deploy-target
+            HostName $SSH_HOST
+            User ${{ secrets.SSH_USER }}
+            Port $SSH_PORT
+            PubkeyAuthentication no
+            PreferredAuthentications password,keyboard-interactive
+            NumberOfPasswordPrompts 1
+          EOF
+          chmod 600 ~/.ssh/config
+
+      - name: Copy the compose file
+        env:
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH || '/srv/rg' }}
+        run: |
+          sshpass -e ssh deploy-target "mkdir -p '$DEPLOY_PATH'"
+          sshpass -e scp compose.prod.yaml "deploy-target:$DEPLOY_PATH/compose.prod.yaml"
+
+      - name: Pull and restart
+        env:
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH || '/srv/rg' }}
+          IMAGE: ${{ needs.build.outputs.image }}
+          # Short-lived and scoped to this job — nothing is left on the
+          # server, so no long-lived registry credentials to rotate.
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          sshpass -e ssh deploy-target "IMAGE='$IMAGE' DEPLOY_PATH='$DEPLOY_PATH' GHCR_TOKEN='$GHCR_TOKEN' ACTOR='${{ github.actor }}' bash -s" <<'EOF'
+          set -euo pipefail
+          cd "$DEPLOY_PATH"
+
+          echo "$GHCR_TOKEN" | docker login ghcr.io -u "$ACTOR" --password-stdin
+
+          # IMAGE is the commit-pinned tag, so a rollback is just re-running
+          # an older workflow.
+          export IMAGE
+          docker compose -f compose.prod.yaml pull
+          docker compose -f compose.prod.yaml up -d
+
+          docker logout ghcr.io
+          docker image prune -f
+          EOF
+
+      - name: Wait for the container to come back healthy
+        env:
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH || '/srv/rg' }}
+        run: |
+          sshpass -e ssh deploy-target "DEPLOY_PATH='$DEPLOY_PATH' bash -s" <<'EOF'
+          set -euo pipefail
+          cd "$DEPLOY_PATH"
+          for i in $(seq 1 30); do
+            id=$(docker compose -f compose.prod.yaml ps -q app)
+            state=$(docker inspect -f '{{.State.Health.Status}}' "$id" 2>/dev/null || echo starting)
+            case "$state" in
+              healthy) echo "healthy after ${i}0s"; exit 0 ;;
+              unhealthy) echo "container reported unhealthy"; break ;;
+            esac
+            sleep 10
+          done
+          echo "--- last 50 log lines ---"
+          docker compose -f compose.prod.yaml logs --tail=50 app
+          exit 1
+          EOF

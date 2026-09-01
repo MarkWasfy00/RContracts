@@ -1,0 +1,31 @@
+name: rg
+
+# The stack as it runs on the server. Unlike compose.yaml this never builds —
+# it pulls the image the Deploy workflow pushed to GHCR.
+#
+# This file is copied here by .github/workflows/deploy.yml; edit it in the
+# repository, not on the server. The .env next to it is yours and is left
+# alone by deploys — that is where ADMIN_TOKEN lives.
+#
+#   docker compose -f compose.prod.yaml logs -f     follow logs
+#   docker compose -f compose.prod.yaml down        stop (content is kept)
+
+services:
+  app:
+    # The workflow exports IMAGE with a commit-pinned tag; :latest is the
+    # fallback for running this by hand on the server.
+    image: ${IMAGE:-ghcr.io/markwasfy00/rcontracts:latest}
+    pull_policy: always
+    restart: unless-stopped
+    init: true
+    ports:
+      - "${HOST_PORT:-4000}:4000"
+    environment:
+      ADMIN_TOKEN: ${ADMIN_TOKEN:-}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:${HOST_PORT:-4000}}
+    volumes:
+      # db.json lives here, outside the image, so deploys don't reset content.
+      - rg-data:/app/data
+
+volumes:
+  rg-data:
