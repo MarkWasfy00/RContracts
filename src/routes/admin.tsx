@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import type { FormEvent } from 'react'
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
@@ -7,6 +8,9 @@ import {
   ExternalLink,
   ImageOff,
   KeyRound,
+  Loader2,
+  LogIn,
+  LogOut,
   Pencil,
   Plus,
   RotateCcw,
@@ -18,12 +22,14 @@ import {
   ApiError,
   createProject,
   deleteProject,
+  fetchAuthRequired,
   fetchSettings,
   getAdminToken,
   resetAllContent,
   setAdminToken,
   updateProject,
   updateSettings,
+  verifyAdminToken,
 } from '@/lib/api'
 import {
   categoryLabel,
@@ -57,6 +63,177 @@ import { Separator } from '@/components/ui/separator'
 export const Route = createFileRoute('/admin')({ component: AdminPage })
 
 function AdminPage() {
+  // Stay on 'checking' until the server has told us whether a key is needed
+  // and whether the saved one still works. Skipping that check would drop you
+  // into the dashboard with a stale key and fail on the first save instead.
+  const [state, setState] = useState<'checking' | 'locked' | 'unlocked'>(
+    'checking',
+  )
+  // False when the server runs without ADMIN_TOKEN: there is no session to
+  // end, so the dashboard hides its logout button.
+  const [gated, setGated] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function check() {
+      try {
+        if (!(await fetchAuthRequired())) {
+          // Server started without ADMIN_TOKEN — there is nothing to log into.
+          if (!cancelled) setState('unlocked')
+          return
+        }
+        setGated(true)
+        const saved = getAdminToken()
+        if (!saved) {
+          if (!cancelled) setState('locked')
+          return
+        }
+        await verifyAdminToken(saved)
+        if (!cancelled) setState('unlocked')
+      } catch (error) {
+        // A key the server rejected is worth forgetting. A server that is
+        // simply unreachable is not — keep it and let them retry.
+        if (error instanceof ApiError && error.status === 401) setAdminToken('')
+        if (!cancelled) setState('locked')
+      }
+    }
+
+    check()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  if (state === 'checking') {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <Loader2 className="size-5 animate-spin text-primary" />
+      </div>
+    )
+  }
+
+  if (state === 'locked') {
+    return <LoginScreen onUnlocked={() => setState('unlocked')} />
+  }
+
+  return (
+    <AdminDashboard
+      onLogout={
+        gated
+          ? () => {
+              setAdminToken('')
+              setState('locked')
+            }
+          : undefined
+      }
+    />
+  )
+}
+
+function LoginScreen({ onUnlocked }: { onUnlocked: () => void }) {
+  const [key, setKey] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [checking, setChecking] = useState(false)
+
+  async function submit(event: FormEvent) {
+    event.preventDefault()
+    const candidate = key.trim()
+    if (!candidate || checking) return
+
+    setChecking(true)
+    setError(null)
+    try {
+      await verifyAdminToken(candidate)
+      setAdminToken(candidate)
+      onUnlocked()
+    } catch (err) {
+      setError(
+        err instanceof ApiError && err.status === 401
+          ? 'مفتاح الإدارة غير صحيح'
+          : err instanceof Error
+            ? err.message
+            : 'حصل خطأ غير متوقع',
+      )
+      setKey('')
+      setChecking(false)
+    }
+  }
+
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-background px-4 text-foreground">
+      <div className="w-full max-w-sm">
+        <div className="mb-8 flex flex-col items-center gap-3 text-center">
+          <img
+            src="/media/logo.jpg"
+            alt="شعار RG"
+            className="size-14 rounded-xl object-cover ring-1 ring-primary/40"
+          />
+          <div>
+            <h1 className="font-display text-xl font-extrabold text-primary">
+              لوحة التحكم
+            </h1>
+            <p className="mt-1 text-[11px] font-bold tracking-wide text-muted-foreground">
+              RG GENERAL CONTRACTS
+            </p>
+          </div>
+        </div>
+
+        <form
+          onSubmit={submit}
+          className="grid gap-4 rounded-2xl border bg-card p-6"
+        >
+          <div className="grid gap-2">
+            <Label htmlFor="admin-key" className="flex items-center gap-2">
+              <KeyRound className="size-4 text-primary" />
+              مفتاح الإدارة
+            </Label>
+            <Input
+              id="admin-key"
+              type="password"
+              dir="ltr"
+              autoFocus
+              autoComplete="current-password"
+              value={key}
+              onChange={(event) => {
+                setError(null)
+                setKey(event.target.value)
+              }}
+              placeholder="••••••••"
+            />
+          </div>
+
+          {error && (
+            <div className="flex items-start gap-2 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm leading-6">
+              <AlertCircle className="mt-0.5 size-4 shrink-0 text-destructive" />
+              <p className="m-0">{error}</p>
+            </div>
+          )}
+
+          <Button type="submit" disabled={!key.trim() || checking}>
+            {checking ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <LogIn className="size-4" />
+            )}
+            دخول
+          </Button>
+        </form>
+
+        <div className="mt-6 text-center">
+          <Link
+            to="/"
+            className="text-sm font-bold text-muted-foreground hover:text-primary"
+          >
+            رجوع للموقع
+          </Link>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function AdminDashboard({ onLogout }: { onLogout?: () => void }) {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <header className="sticky top-0 z-40 border-b border-border/60 bg-background/80 backdrop-blur-md">
@@ -76,18 +253,25 @@ function AdminPage() {
               </div>
             </div>
           </div>
-          <Button variant="outline" asChild>
-            <Link to="/">
-              <ExternalLink className="size-4" />
-              عرض الموقع
-            </Link>
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" asChild>
+              <Link to="/">
+                <ExternalLink className="size-4" />
+                عرض الموقع
+              </Link>
+            </Button>
+            {onLogout && (
+              <Button variant="outline" onClick={onLogout}>
+                <LogOut className="size-4" />
+                خروج
+              </Button>
+            )}
+          </div>
         </div>
       </header>
 
       <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
         <ConnectionStatus />
-        <AdminKeyCard />
 
         <Tabs defaultValue="projects">
           <TabsList className="mb-6">
@@ -121,7 +305,7 @@ function ErrorNote({ error }: { error: unknown }) {
       <AlertCircle className="mt-1 size-4 shrink-0 text-destructive" />
       <p className="m-0">
         {message}
-        {isAuth && ' — اكتب مفتاح الإدارة الصحيح في الخانة أعلى الصفحة.'}
+        {isAuth && ' — اضغط خروج وسجّل الدخول تاني.'}
       </p>
     </div>
   )
@@ -164,51 +348,6 @@ function ConnectionStatus() {
         متصل بالخادم — كل التعديلات بتتحفظ في قاعدة البيانات مباشرة.
       </p>
     </div>
-  )
-}
-
-function AdminKeyCard() {
-  const [token, setToken] = useState(getAdminToken())
-  const [saved, setSaved] = useState(false)
-
-  return (
-    <form
-      className="mb-6 flex flex-wrap items-end gap-3 rounded-xl border bg-card p-4"
-      onSubmit={(e) => {
-        e.preventDefault()
-        setAdminToken(token.trim())
-        setSaved(true)
-      }}
-    >
-      <div className="grid min-w-56 flex-1 gap-2">
-        <Label htmlFor="admin-token" className="flex items-center gap-2">
-          <KeyRound className="size-4 text-primary" />
-          مفتاح الإدارة
-        </Label>
-        <Input
-          id="admin-token"
-          type="password"
-          dir="ltr"
-          autoComplete="off"
-          value={token}
-          onChange={(e) => {
-            setSaved(false)
-            setToken(e.target.value)
-          }}
-          placeholder="مطلوب فقط لو الخادم شغال بـ ADMIN_TOKEN"
-        />
-      </div>
-      <Button type="submit" variant="outline">
-        <Save className="size-4" />
-        حفظ المفتاح
-      </Button>
-      {saved && (
-        <span className="flex items-center gap-1.5 text-sm font-bold text-primary">
-          <CheckCircle2 className="size-4" />
-          تم الحفظ
-        </span>
-      )}
-    </form>
   )
 }
 

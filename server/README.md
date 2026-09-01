@@ -33,11 +33,20 @@ All optional; see `.env.example`. Load a file with
 ## Endpoints
 
 Reads are public. Writes require `Authorization: Bearer <ADMIN_TOKEN>` when
-`ADMIN_TOKEN` is set — the admin page sends it from the "مفتاح الإدارة" field.
+`ADMIN_TOKEN` is set — the admin page sends it from the key entered at login.
+
+When `ADMIN_TOKEN` is set, `/admin` opens on a login screen and stays locked
+until the key passes `/api/auth/verify`; the key is then kept in the browser's
+local storage until "خروج". With `ADMIN_TOKEN` unset there is nothing to check,
+so the login screen is skipped entirely and local development is unaffected.
+Note the gate is a convenience, not the security boundary — the API's token
+check is what actually protects the content.
 
 | Method | Path | Notes |
 | --- | --- | --- |
 | `GET` | `/api/health` | Liveness check |
+| `GET` | `/api/auth` | `{ required }` — whether `ADMIN_TOKEN` is set |
+| `POST` | `/api/auth/verify` | Checks a key without writing. `204` or `401` |
 | `GET` | `/api/projects` | All portfolio projects |
 | `POST` | `/api/projects` | Create; server assigns the `id`. Returns 201 |
 | `PUT` | `/api/projects/:id` | Replace a project |

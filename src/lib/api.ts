@@ -47,8 +47,11 @@ async function request<T>(
   const headers = new Headers(init.headers)
   if (init.body) headers.set('Content-Type', 'application/json')
 
-  const token = getAdminToken()
-  if (token) headers.set('Authorization', `Bearer ${token}`)
+  // The login screen sets this itself to test a key it hasn't stored yet.
+  if (!headers.has('Authorization')) {
+    const token = getAdminToken()
+    if (token) headers.set('Authorization', `Bearer ${token}`)
+  }
 
   let response: Response
   try {
@@ -76,6 +79,25 @@ async function request<T>(
   }
 
   return payload as T
+}
+
+// ── Auth ──────────────────────────────────────────────────────────
+
+/**
+ * Whether the server was started with ADMIN_TOKEN set. When it wasn't, there
+ * is no key to check and /admin skips its login screen.
+ */
+export async function fetchAuthRequired(): Promise<boolean> {
+  const result = await request<{ required: boolean }>('/auth')
+  return result?.required ?? false
+}
+
+/** Throws ApiError(401) when the key is wrong. Stores nothing. */
+export async function verifyAdminToken(token: string): Promise<void> {
+  await request<void>('/auth/verify', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  })
 }
 
 // ── Projects ──────────────────────────────────────────────────────

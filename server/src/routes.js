@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { Router } from 'express'
 
-import { requireAdmin } from './auth.js'
+import { authEnabled, requireAdmin } from './auth.js'
 import {
   addProject,
   getSettings,
@@ -17,6 +17,20 @@ export const api = Router()
 
 api.get('/health', (_req, res) => {
   res.json({ status: 'ok', time: new Date().toISOString() })
+})
+
+// ── Auth ──────────────────────────────────────────────────────────
+
+// Lets /admin know whether to show its login screen at all. A server running
+// without ADMIN_TOKEN (local development) has nothing to log into.
+api.get('/auth', (_req, res) => {
+  res.json({ required: authEnabled })
+})
+
+// Checks a key without writing anything, so the login screen can tell a
+// wrong key from a working one. requireAdmin answers 401 on a bad key.
+api.post('/auth/verify', requireAdmin, (_req, res) => {
+  res.status(204).end()
 })
 
 // ── Projects ──────────────────────────────────────────────────────
