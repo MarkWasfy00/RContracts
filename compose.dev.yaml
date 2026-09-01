@@ -1,0 +1,49 @@
+name: rg-dev
+
+# Development stack with hot reload — Vite on :3000, the API on :4000,
+# both watching your local files. Useful when you'd rather not install
+# Node locally; otherwise `npm run dev` on the host is faster.
+#
+#   docker compose -f compose.dev.yaml up
+#
+# Dependencies install into named volumes, so the container never touches
+# the node_modules on your machine.
+
+services:
+  api:
+    image: node:24-alpine
+    working_dir: /app/server
+    command: sh -c "npm install && node --watch src/index.js"
+    init: true
+    environment:
+      DATA_DIR: /app/server/data
+      CORS_ORIGIN: "*"
+      ADMIN_TOKEN: ${ADMIN_TOKEN:-}
+    volumes:
+      - ./server:/app/server
+      - api-node-modules:/app/server/node_modules
+    ports:
+      - "4000:4000"
+
+  web:
+    image: node:24-alpine
+    working_dir: /app
+    command: sh -c "npm install && npm run dev:web -- --host 0.0.0.0"
+    init: true
+    environment:
+      # Vite proxies /api to the api service instead of localhost.
+      VITE_API_PROXY: http://api:4000
+      # Bind-mounted files on Docker Desktop don't always emit change
+      # events; polling makes the watcher reliable at the cost of some CPU.
+      CHOKIDAR_USEPOLLING: "true"
+    volumes:
+      - .:/app
+      - web-node-modules:/app/node_modules
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+
+volumes:
+  api-node-modules:
+  web-node-modules:

@@ -1,0 +1,26 @@
+# Dependencies are installed inside the image — never copy the host's,
+# they contain platform-specific binaries.
+node_modules
+**/node_modules
+
+# Built in the image by the build stage.
+dist
+dist-ssr
+
+# Runtime state — the database lives in a Docker volume, not the image.
+server/data
+
+.git
+.gitignore
+.github
+.vscode
+.tanstack
+.env
+.env.*
+!.env.example
+*.local
+npm-debug.log*
+Dockerfile
+compose*.yaml
+compose*.yml
+.dockerignore
