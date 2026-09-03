@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { Suspense, lazy, useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import {
   ArrowLeft,
@@ -26,6 +26,9 @@ import {
 } from '@/lib/site-data'
 import type { Project } from '@/lib/site-data'
 import { useProjects, useSiteSettings } from '@/lib/queries'
+const HeroCanvas = lazy(() =>
+  import('@/components/hero-canvas').then((m) => ({ default: m.HeroCanvas })),
+)
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -274,7 +277,7 @@ function Hero() {
   return (
     <section id="home" className="relative overflow-hidden pt-16">
       <div
-        className="absolute inset-0 bg-cover bg-center"
+        className="absolute inset-0 bg-cover bg-center opacity-40"
         style={{ backgroundImage: `url('${settings.heroImage}')` }}
         aria-hidden
       />
@@ -282,6 +285,9 @@ function Hero() {
         className="absolute inset-0 bg-gradient-to-b from-background/95 via-background/85 to-background"
         aria-hidden
       />
+      <Suspense fallback={null}>
+        <HeroCanvas />
+      </Suspense>
 
       <div className="relative mx-auto flex max-w-6xl flex-col items-center px-4 py-24 text-center sm:px-6 md:py-32">
         <Badge variant="outline" className="mb-6 gap-2 px-4 py-1.5 text-sm">
