@@ -40,7 +40,9 @@ app.use(
     origin: CORS_ORIGIN === '*' ? true : CORS_ORIGIN.split(',').map((o) => o.trim()),
   }),
 )
-app.use(express.json({ limit: '1mb' }))
+// Matches nginx's client_max_body_size in front of it — a body that gets
+// past the proxy should not then be rejected here.
+app.use(express.json({ limit: '25mb' }))
 
 app.use((req, _res, next) => {
   if (req.method !== 'GET') {
