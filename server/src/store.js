@@ -3,7 +3,9 @@ import { dirname, join, resolve } from 'node:path'
 
 import { defaultProjects, defaultSettings } from './defaults.js'
 
-const DATA_DIR = resolve(process.env.DATA_DIR ?? join(process.cwd(), 'data'))
+export const DATA_DIR = resolve(
+  process.env.DATA_DIR ?? join(process.cwd(), 'data'),
+)
 const DB_FILE = join(DATA_DIR, 'db.json')
 
 /** In-memory copy of the database — the file is written from this. */

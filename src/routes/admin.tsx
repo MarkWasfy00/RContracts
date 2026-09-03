@@ -6,7 +6,6 @@ import {
   AlertCircle,
   CheckCircle2,
   ExternalLink,
-  ImageOff,
   KeyRound,
   Loader2,
   LogIn,
@@ -35,8 +34,14 @@ import {
   categoryLabel,
   projectCategories,
 } from '@/lib/site-data'
+import {
+  MediaField,
+  MediaLibrary,
+  MediaPreview,
+} from '@/components/media-field'
 import type { Project, SiteSettings } from '@/lib/site-data'
 import { projectsQueryKey, settingsQueryKey, useProjects } from '@/lib/queries'
+import { useDocumentMeta } from '@/lib/seo'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -63,6 +68,9 @@ import { Separator } from '@/components/ui/separator'
 export const Route = createFileRoute('/admin')({ component: AdminPage })
 
 function AdminPage() {
+  useDocumentMeta({ title: 'لوحة التحكم' })
+
+
   // Stay on 'checking' until the server has told us whether a key is needed
   // and whether the saved one still works. Skipping that check would drop you
   // into the dashboard with a stale key and fail on the first save instead.
@@ -277,6 +285,7 @@ function AdminDashboard({ onLogout }: { onLogout?: () => void }) {
           <TabsList className="mb-6">
             <TabsTrigger value="projects">المشاريع</TabsTrigger>
             <TabsTrigger value="settings">محتوى الصفحة</TabsTrigger>
+            <TabsTrigger value="media">الملفات</TabsTrigger>
           </TabsList>
 
           <TabsContent value="projects">
@@ -284,6 +293,9 @@ function AdminDashboard({ onLogout }: { onLogout?: () => void }) {
           </TabsContent>
           <TabsContent value="settings">
             <SettingsManager />
+          </TabsContent>
+          <TabsContent value="media">
+            <MediaManager />
           </TabsContent>
         </Tabs>
       </main>
@@ -433,9 +445,10 @@ function ProjectsManager() {
       <div className="grid gap-4 sm:grid-cols-2">
         {projects.map((project) => (
           <Card key={project.id} className="gap-0 overflow-hidden py-0">
-            <img
+            <MediaPreview
               src={project.image}
               alt={project.title}
+              controls={false}
               className="aspect-[16/9] w-full object-cover"
             />
             <CardContent className="space-y-3 py-4">
@@ -659,28 +672,14 @@ function ProjectFormFields({
         </div>
       </div>
 
-      <div className="grid gap-2">
-        <Label htmlFor="p-image">رابط الصورة</Label>
-        <Input
-          id="p-image"
-          required
-          dir="ltr"
-          value={form.image}
-          onChange={(e) => set({ image: e.target.value })}
-          placeholder="/media/post4.png أو https://..."
-        />
-        <p className="m-0 text-xs leading-6 text-muted-foreground">
-          حاليًا: حط الصورة في مجلد{' '}
-          <code dir="ltr" className="rounded bg-muted px-1 py-0.5">
-            public/media
-          </code>{' '}
-          واكتب مسارها هنا، أو استخدم رابط مباشر. رفع الصور من الجهاز هيتفعل مع
-          الـ API.
-        </p>
-        {form.image.trim() ? (
-          <ImagePreview src={form.image.trim()} />
-        ) : null}
-      </div>
+      <MediaField
+        id="p-image"
+        label="صورة أو فيديو المشروع"
+        required
+        value={form.image}
+        onChange={(image) => set({ image })}
+        hint="ارفع صورة (JPG/PNG/WebP/GIF) أو فيديو (MP4/WebM/MOV) من جهازك، أو حط رابط مباشر."
+      />
 
       <ErrorNote error={error} />
 
@@ -694,25 +693,26 @@ function ProjectFormFields({
   )
 }
 
-function ImagePreview({ src }: { src: string }) {
-  const [failed, setFailed] = useState(false)
+/* ── Media ─────────────────────────────────────────────────────── */
 
-  if (failed) {
-    return (
-      <div className="flex aspect-[16/9] items-center justify-center gap-2 rounded-lg border border-dashed text-sm text-muted-foreground">
-        <ImageOff className="size-4" />
-        تعذر تحميل الصورة من المسار ده
-      </div>
-    )
-  }
+/**
+ * The "الملفات" tab. Uploading happens inside the fields that need a file;
+ * this is where the uploads are reviewed and the unused ones deleted.
+ */
+function MediaManager() {
   return (
-    <img
-      key={src}
-      src={src}
-      alt="معاينة"
-      className="aspect-[16/9] w-full rounded-lg border object-cover"
-      onError={() => setFailed(true)}
-    />
+    <Card>
+      <CardHeader>
+        <CardTitle>الصور والفيديوهات المرفوعة</CardTitle>
+        <CardDescription>
+          كل الملفات اللي اترفعت من لوحة التحكم. امسح اللي مش مستخدم — لكن خلي
+          بالك إن حذف ملف مستخدم في مشروع هيخلي مكانه فاضي.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <MediaLibrary />
+      </CardContent>
+    </Card>
   )
 }
 
@@ -877,15 +877,13 @@ function SettingsForm({ initial }: { initial: SiteSettings }) {
               onChange={(e) => set({ heroSubtitle: e.target.value })}
             />
           </div>
-          <div className="grid gap-2">
-            <Label htmlFor="s-hero-image">صورة الخلفية</Label>
-            <Input
-              id="s-hero-image"
-              dir="ltr"
-              value={form.heroImage}
-              onChange={(e) => set({ heroImage: e.target.value })}
-            />
-          </div>
+          <MediaField
+            id="s-hero-image"
+            label="خلفية الهيرو (صورة أو فيديو)"
+            value={form.heroImage}
+            onChange={(heroImage) => set({ heroImage })}
+            hint="الفيديو بيشتغل تلقائي وبدون صوت كخلفية للقسم الأول."
+          />
 
           <Separator />
 
@@ -973,16 +971,13 @@ function SettingsForm({ initial }: { initial: SiteSettings }) {
               }
             />
           </div>
-          <div className="grid gap-4 sm:grid-cols-3">
-            <div className="grid gap-2">
-              <Label htmlFor="s-about-image">صورة القسم</Label>
-              <Input
-                id="s-about-image"
-                dir="ltr"
-                value={form.aboutImage}
-                onChange={(e) => set({ aboutImage: e.target.value })}
-              />
-            </div>
+          <MediaField
+            id="s-about-image"
+            label="صورة أو فيديو القسم"
+            value={form.aboutImage}
+            onChange={(aboutImage) => set({ aboutImage })}
+          />
+          <div className="grid gap-4 sm:grid-cols-2">
             <div className="grid gap-2">
               <Label htmlFor="s-founder">اسم المؤسس</Label>
               <Input

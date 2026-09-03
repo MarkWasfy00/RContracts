@@ -1,5 +1,5 @@
 import { Suspense, lazy, useState } from 'react'
-import { createFileRoute } from '@tanstack/react-router'
+import { Link, createFileRoute } from '@tanstack/react-router'
 import {
   ArrowLeft,
   Building2,
@@ -7,25 +7,33 @@ import {
   DraftingCompass,
   HardHat,
   MapPin,
-  Menu,
   PaintRoller,
   Phone,
+  Play,
   Ruler,
   Sofa,
   Sparkles,
   UtensilsCrossed,
   Wrench,
-  X,
 } from 'lucide-react'
 
 import {
   categoryLabel,
+  isVideoSrc,
   phoneTelHref,
   projectCategories,
+  videoStillSrc,
   whatsappHref,
 } from '@/lib/site-data'
 import type { Project } from '@/lib/site-data'
 import { useProjects, useSiteSettings } from '@/lib/queries'
+import { metaDescription, useDocumentMeta } from '@/lib/seo'
+import {
+  BrandMark,
+  Footer,
+  Instagram,
+  Navbar,
+} from '@/components/site-chrome'
 const HeroCanvas = lazy(() =>
   import('@/components/hero-canvas').then((m) => ({ default: m.HeroCanvas })),
 )
@@ -38,14 +46,6 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   Accordion,
@@ -53,20 +53,11 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion'
-import { Separator } from '@/components/ui/separator'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 
 export const Route = createFileRoute('/')({ component: Home })
-
-const navLinks = [
-  { href: '#home', label: 'الرئيسية' },
-  { href: '#services', label: 'خدماتنا' },
-  { href: '#portfolio', label: 'أعمالنا' },
-  { href: '#about', label: 'من نحن' },
-  { href: '#contact', label: 'تواصل معنا' },
-]
 
 const services = [
   {
@@ -154,6 +145,12 @@ const faqs = [
 ]
 
 function Home() {
+  const settings = useSiteSettings()
+
+  // The server renders the full head for the first load; this keeps the tab
+  // title right when a visitor comes back here from a project page.
+  useDocumentMeta({ description: metaDescription(settings.heroSubtitle) })
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       <Navbar />
@@ -171,116 +168,35 @@ function Home() {
   )
 }
 
-function Instagram({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-    >
-      <rect width="20" height="20" x="2" y="2" rx="5" ry="5" />
-      <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
-      <line x1="17.5" x2="17.51" y1="6.5" y2="6.5" />
-    </svg>
-  )
-}
-
-function BrandMark({ className = 'size-11' }: { className?: string }) {
-  return (
-    <img
-      src="/media/logo.jpg"
-      alt="شعار RG"
-      className={`${className} rounded-lg object-cover ring-1 ring-primary/40`}
-    />
-  )
-}
-
-function Navbar() {
-  const settings = useSiteSettings()
-  const [open, setOpen] = useState(false)
-
-  return (
-    <header className="fixed inset-x-0 top-0 z-40 border-b border-border/60 bg-background/80 backdrop-blur-md">
-      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
-        {/*
-          The brand sits on the visual left even though the page is RTL, so
-          it is ordered last. Its contents are Latin text, hence the ltr
-          direction inside.
-        */}
-        <a href="#home" className="order-last flex items-center gap-3" dir="ltr">
-          <BrandMark className="size-10" />
-          <span className="leading-tight">
-            <span className="block font-display text-lg font-extrabold tracking-wide text-primary">
-              RG
-            </span>
-            <span className="block text-[11px] font-bold text-muted-foreground">
-              GENERAL CONTRACTS
-            </span>
-          </span>
-        </a>
-
-        <nav className="hidden items-center gap-1 md:flex">
-          {navLinks.map((link) => (
-            <a
-              key={link.href}
-              href={link.href}
-              className="rounded-md px-3 py-2 text-sm font-bold text-muted-foreground transition-colors hover:text-primary"
-            >
-              {link.label}
-            </a>
-          ))}
-        </nav>
-
-        <Button
-          variant="ghost"
-          size="icon"
-          className="md:hidden"
-          aria-label="القائمة"
-          onClick={() => setOpen((v) => !v)}
-        >
-          {open ? <X className="size-5" /> : <Menu className="size-5" />}
-        </Button>
-      </div>
-
-      {open && (
-        <nav className="border-t border-border/60 bg-background px-4 pb-4 md:hidden">
-          {navLinks.map((link) => (
-            <a
-              key={link.href}
-              href={link.href}
-              onClick={() => setOpen(false)}
-              className="block rounded-md px-3 py-3 text-sm font-bold text-muted-foreground transition-colors hover:text-primary"
-            >
-              {link.label}
-            </a>
-          ))}
-          <Button asChild className="mt-2 w-full">
-            <a href={phoneTelHref(settings)}>
-              <Phone className="size-4" />
-              {settings.phoneDisplay}
-            </a>
-          </Button>
-        </nav>
-      )}
-    </header>
-  )
-}
-
 function Hero() {
   const settings = useSiteSettings()
 
   return (
     <section id="home" className="relative overflow-hidden pt-16">
-      <div
-        className="absolute inset-0 bg-cover bg-center opacity-40"
-        style={{ backgroundImage: `url('${settings.heroImage}')` }}
-        aria-hidden
-      />
+      {/*
+        The backdrop is whatever the admin uploaded. A video plays itself,
+        silently and on a loop — it is decoration behind the headline, so it
+        never gets controls.
+      */}
+      {isVideoSrc(settings.heroImage) ? (
+        <video
+          key={settings.heroImage}
+          src={settings.heroImage}
+          className="absolute inset-0 size-full object-cover opacity-40"
+          autoPlay
+          muted
+          loop
+          playsInline
+          preload="metadata"
+          aria-hidden
+        />
+      ) : (
+        <div
+          className="absolute inset-0 bg-cover bg-center opacity-40"
+          style={{ backgroundImage: `url('${settings.heroImage}')` }}
+          aria-hidden
+        />
+      )}
       <div
         className="absolute inset-0 bg-gradient-to-b from-background/95 via-background/85 to-background"
         aria-hidden
@@ -395,55 +311,62 @@ function Services() {
   )
 }
 
+/**
+ * A card in the portfolio grid. It links to the project's own page rather
+ * than opening a dialog, so each project is a real URL that can be shared,
+ * bookmarked, and indexed.
+ */
 function ProjectCard({ project }: { project: Project }) {
   return (
-    <Dialog>
-      <DialogTrigger asChild>
-        <button className="group relative block w-full cursor-pointer overflow-hidden rounded-xl border text-start transition-colors hover:border-primary/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-          <img
-            src={project.image}
-            alt={project.title}
-            loading="lazy"
-            className="aspect-[4/5] w-full object-cover transition-transform duration-500 group-hover:scale-105"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-ink via-ink/30 to-transparent" />
-          <div className="absolute inset-x-0 bottom-0 p-5">
-            <div className="mb-2 flex flex-wrap gap-1.5">
-              {project.tags.map((tag) => (
-                <Badge key={tag} variant="secondary" className="bg-secondary/80">
-                  {tag}
-                </Badge>
-              ))}
-            </div>
-            <h3 className="font-display text-lg font-extrabold text-cream">
-              {project.title}
-            </h3>
-          </div>
-        </button>
-      </DialogTrigger>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
-        <DialogHeader>
-          <DialogTitle className="font-display text-xl">
-            {project.title}
-          </DialogTitle>
-          <DialogDescription className="leading-7">
-            {project.description}
-          </DialogDescription>
-        </DialogHeader>
+    <Link
+      to="/projects/$projectId"
+      params={{ projectId: project.id }}
+      className="group relative block w-full overflow-hidden rounded-xl border text-start transition-colors hover:border-primary/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    >
+      {/*
+        A video project shows its first frame in the grid — a wall of cards
+        all playing at once would fight the page. It plays on its own page.
+      */}
+      {isVideoSrc(project.image) ? (
+        <video
+          src={videoStillSrc(project.image)}
+          muted
+          playsInline
+          preload="metadata"
+          className="aspect-[4/5] w-full bg-ink object-cover transition-transform duration-500 group-hover:scale-105"
+          aria-hidden
+        />
+      ) : (
         <img
           src={project.image}
           alt={project.title}
-          className="w-full rounded-lg border"
+          loading="lazy"
+          className="aspect-[4/5] w-full object-cover transition-transform duration-500 group-hover:scale-105"
         />
-        <div className="flex flex-wrap gap-2">
+      )}
+      {isVideoSrc(project.image) ? (
+        <span className="absolute end-3 top-3 flex size-9 items-center justify-center rounded-full bg-ink/70 text-cream backdrop-blur-sm">
+          <Play className="size-4 fill-current" />
+        </span>
+      ) : null}
+      <div className="absolute inset-0 bg-gradient-to-t from-ink via-ink/30 to-transparent" />
+      <div className="absolute inset-x-0 bottom-0 p-5">
+        <div className="mb-2 flex flex-wrap gap-1.5">
           {project.tags.map((tag) => (
-            <Badge key={tag} variant="outline">
+            <Badge key={tag} variant="secondary" className="bg-secondary/80">
               {tag}
             </Badge>
           ))}
         </div>
-      </DialogContent>
-    </Dialog>
+        <h3 className="font-display text-lg font-extrabold text-cream">
+          {project.title}
+        </h3>
+        <span className="mt-2 flex items-center gap-1.5 text-sm font-bold text-primary">
+          شوف التفاصيل
+          <ArrowLeft className="size-4 transition-transform group-hover:-translate-x-1" />
+        </span>
+      </div>
+    </Link>
   )
 }
 
@@ -538,12 +461,24 @@ function About() {
       <div className="mx-auto grid max-w-6xl items-center gap-12 px-4 sm:px-6 lg:grid-cols-2">
         <div className="relative order-2 lg:order-1">
           <div className="overflow-hidden rounded-2xl border">
-            <img
-              src={settings.aboutImage}
-              alt="من أعمال RG General Contracts"
-              loading="lazy"
-              className="w-full object-cover"
-            />
+            {isVideoSrc(settings.aboutImage) ? (
+              <video
+                src={settings.aboutImage}
+                autoPlay
+                muted
+                loop
+                playsInline
+                preload="metadata"
+                className="w-full bg-ink object-cover"
+              />
+            ) : (
+              <img
+                src={settings.aboutImage}
+                alt="من أعمال RG General Contracts"
+                loading="lazy"
+                className="w-full object-cover"
+              />
+            )}
           </div>
           <div className="absolute -bottom-5 -end-3 flex items-center gap-3 rounded-xl border bg-card p-4 shadow-xl sm:-end-5">
             <BrandMark className="size-12" />
@@ -799,72 +734,5 @@ function Contact() {
         </Card>
       </div>
     </section>
-  )
-}
-
-function Footer() {
-  const settings = useSiteSettings()
-
-  return (
-    <footer className="border-t py-10">
-      <div className="mx-auto max-w-6xl px-4 sm:px-6">
-        <div className="flex flex-col items-center justify-between gap-6 md:flex-row">
-          <div className="flex items-center gap-3">
-            <BrandMark className="size-10" />
-            <div>
-              <div className="font-display font-extrabold text-primary">
-                RG General Contracts
-              </div>
-              <div className="text-xs text-muted-foreground">
-                مقاولات عامة · تشطيبات · ديكورات
-              </div>
-            </div>
-          </div>
-
-          <nav className="flex flex-wrap items-center justify-center gap-1">
-            {navLinks.map((link) => (
-              <a
-                key={link.href}
-                href={link.href}
-                className="rounded-md px-3 py-2 text-sm font-bold text-muted-foreground transition-colors hover:text-primary"
-              >
-                {link.label}
-              </a>
-            ))}
-          </nav>
-
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="icon" asChild>
-              <a
-                href={settings.instagramUrl}
-                target="_blank"
-                rel="noreferrer"
-                aria-label="إنستجرام"
-              >
-                <Instagram className="size-4" />
-              </a>
-            </Button>
-            <Button variant="outline" size="icon" asChild>
-              <a href={phoneTelHref(settings)} aria-label="اتصل بنا">
-                <Phone className="size-4" />
-              </a>
-            </Button>
-          </div>
-        </div>
-
-        <Separator className="my-6" />
-
-        <div className="flex flex-col items-center justify-between gap-2 text-xs text-muted-foreground md:flex-row">
-          <span>
-            © {new Date().getFullYear()} RG General Contracts — جميع الحقوق
-            محفوظة
-          </span>
-          <span className="flex items-center gap-1.5">
-            <HardHat className="size-3.5 text-primary" />
-            بإشراف {settings.founderName}
-          </span>
-        </div>
-      </div>
-    </footer>
   )
 }

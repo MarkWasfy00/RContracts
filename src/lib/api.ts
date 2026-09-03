@@ -129,6 +129,99 @@ export async function deleteProject(id: string): Promise<void> {
   })
 }
 
+// ── Media library ─────────────────────────────────────────────────
+
+/** One image or video uploaded through the admin page. */
+export interface MediaFile {
+  /** Stored filename — also the id used to delete it. */
+  name: string
+  /** Path to use as a project image or a settings image. */
+  url: string
+  kind: 'image' | 'video'
+  type: string
+  size: number
+  /** ISO timestamp. */
+  modified: string
+}
+
+/** What the server accepts, for a file input's `accept` attribute. */
+export const mediaAccept = [
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/avif',
+  'image/gif',
+  'video/mp4',
+  'video/webm',
+  'video/quicktime',
+].join(',')
+
+/**
+ * Uploads one file and resolves with its stored URL.
+ *
+ * This is the one request that doesn't go through `request()`: fetch cannot
+ * report upload progress, and a video takes long enough that the admin needs
+ * a progress bar rather than a spinner.
+ */
+export function uploadMedia(
+  file: File,
+  onProgress?: (percent: number) => void,
+): Promise<MediaFile> {
+  return new Promise((resolve, reject) => {
+    const body = new FormData()
+    body.append('file', file)
+
+    const xhr = new XMLHttpRequest()
+    xhr.open('POST', `${API_BASE}/media`)
+
+    const token = getAdminToken()
+    if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`)
+
+    xhr.upload.addEventListener('progress', (event) => {
+      if (event.lengthComputable) {
+        onProgress?.(Math.round((event.loaded / event.total) * 100))
+      }
+    })
+
+    xhr.addEventListener('load', () => {
+      let payload: unknown = null
+      try {
+        payload = xhr.responseText ? JSON.parse(xhr.responseText) : null
+      } catch {
+        /* server returned something that isn't JSON */
+      }
+      if (xhr.status >= 200 && xhr.status < 300) {
+        return resolve(payload as MediaFile)
+      }
+      const message =
+        payload && typeof payload === 'object' && 'error' in payload
+          ? String((payload as { error: unknown }).error)
+          : `فشل رفع الملف (${xhr.status})`
+      reject(new ApiError(message, xhr.status))
+    })
+
+    xhr.addEventListener('error', () =>
+      reject(new ApiError('تعذر الاتصال بالخادم أثناء الرفع.', 0)),
+    )
+    xhr.addEventListener('abort', () =>
+      reject(new ApiError('تم إلغاء الرفع.', 0)),
+    )
+
+    xhr.send(body)
+  })
+}
+
+/** Everything uploaded so far, newest first. Requires the admin key. */
+export async function fetchMediaLibrary(): Promise<Array<MediaFile>> {
+  return (await request<Array<MediaFile>>('/media')) ?? []
+}
+
+export async function deleteMedia(name: string): Promise<void> {
+  await request<void>(`/media/${encodeURIComponent(name)}`, {
+    method: 'DELETE',
+  })
+}
+
 // ── Site settings ─────────────────────────────────────────────────
 
 export async function fetchSettings(): Promise<SiteSettings> {

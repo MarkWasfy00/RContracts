@@ -1,7 +1,14 @@
 import { randomUUID } from 'node:crypto'
-import { Router } from 'express'
+import express, { Router } from 'express'
 
 import { authEnabled, requireAdmin } from './auth.js'
+import {
+  UPLOAD_DIR,
+  describeUpload,
+  listMedia,
+  removeMedia,
+  uploadMedia,
+} from './media.js'
 import {
   addProject,
   getSettings,
@@ -11,7 +18,7 @@ import {
   resetAll,
   saveSettings,
 } from './store.js'
-import { parseProject, parseSettings } from './validate.js'
+import { ValidationError, parseProject, parseSettings } from './validate.js'
 
 export const api = Router()
 
@@ -65,6 +72,39 @@ api.put('/settings', requireAdmin, async (req, res) => {
   const settings = await saveSettings(parseSettings(req.body, getSettings()))
   res.json(settings)
 })
+
+// ── Media ─────────────────────────────────────────────────────────
+
+// The library behind the admin page's media picker. Admin-only: the files
+// themselves are public, but which ones exist is not the site's business.
+api.get('/media', requireAdmin, async (_req, res) => {
+  res.json(await listMedia())
+})
+
+// Accepts one image or video from the admin page and answers with the URL
+// to store on the project or setting being edited.
+api.post('/media', requireAdmin, uploadMedia, (req, res) => {
+  if (!req.file) throw new ValidationError('لم يتم إرسال أي ملف')
+  res.status(201).json(describeUpload(req.file))
+})
+
+api.delete('/media/:name', requireAdmin, async (req, res) => {
+  await removeMedia(req.params.name)
+  res.status(204).end()
+})
+
+// Serving the uploads. Mounted under /api so the Vite dev proxy carries
+// them too, which keeps one stored URL working in development and in
+// production. Names are UUIDs, so a URL's content never changes.
+api.use(
+  '/media',
+  express.static(UPLOAD_DIR, {
+    index: false,
+    maxAge: '365d',
+    immutable: true,
+    setHeaders: (res) => res.setHeader('X-Content-Type-Options', 'nosniff'),
+  }),
+)
 
 // ── Maintenance ───────────────────────────────────────────────────
 

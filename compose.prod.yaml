@@ -23,8 +23,11 @@ services:
     environment:
       ADMIN_TOKEN: ${ADMIN_TOKEN:-}
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:${HOST_PORT:-4000}}
+      MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-200}
+      SITE_URL: ${SITE_URL:-}
     volumes:
-      # db.json lives here, outside the image, so deploys don't reset content.
+      # db.json and the uploaded images and videos live here, outside the
+      # image, so deploys don't reset content or lose the uploads.
       - rg-data:/app/data
 
 volumes:

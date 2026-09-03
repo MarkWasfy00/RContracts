@@ -23,9 +23,15 @@ services:
       # The site and API share an origin here, so this only matters if you
       # call the API from another domain.
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:${HOST_PORT:-4000}}
+      # Largest image or video /admin may upload, in megabytes.
+      MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-200}
+      # Public address of the site, used for canonical links and link
+      # previews. Falls back to the requesting host when unset.
+      SITE_URL: ${SITE_URL:-}
     volumes:
-      # db.json lives here. Without this volume, every rebuild resets the
-      # site's content back to the seed data.
+      # db.json and the uploaded images and videos live here. Without this
+      # volume, every rebuild resets the site's content back to the seed
+      # data and loses the uploads.
       - rg-data:/app/data
 
 volumes:

@@ -19,6 +19,29 @@ export function categoryLabel(value: string): string {
   )
 }
 
+/**
+ * Whether a stored media path points at a video rather than an image.
+ *
+ * Projects and settings keep a single URL each, so the renderer works the
+ * type out from the extension. Uploads are named by the server with an
+ * extension matching the file's real type; a pasted external URL is judged
+ * the same way, and anything unrecognised renders as an image.
+ */
+export function isVideoSrc(src: string): boolean {
+  return /\.(mp4|webm|mov|m4v|ogv)(\?|#|$)/i.test(src.trim())
+}
+
+/**
+ * The same video URL, nudged a fraction of a second in.
+ *
+ * A paused `<video>` renders black until the browser has decoded a frame,
+ * which it won't do for `preload="metadata"` alone. The media fragment makes
+ * it seek, so a video used as a thumbnail shows its opening frame.
+ */
+export function videoStillSrc(src: string): string {
+  return src.includes('#') ? src : `${src}#t=0.1`
+}
+
 export interface Project {
   id: string
   image: string

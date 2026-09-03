@@ -4,7 +4,9 @@ Portfolio site for RG General Contracts (مقاولات عامة وتشطيبا�
 with an admin panel for managing the portfolio and page content.
 
 - `/` — the public site (Arabic, RTL)
-- `/admin` — content management: add/edit/delete projects, edit page copy
+- `/projects/<id>` — each project on its own page, with per-page SEO tags
+- `/admin` — content management: add/edit/delete projects, upload images and
+  videos, edit page copy
 - `server/` — Express API that stores it all ([details](./server/README.md))
 
 # Getting Started
@@ -25,7 +27,14 @@ npm start       # serves dist/ AND the API from the Express server on :4000
 ```
 
 Set `ADMIN_TOKEN` before exposing this publicly — otherwise anyone who finds
-`/admin` can edit the site. See [server/README.md](./server/README.md).
+`/admin` can edit the site. Set `SITE_URL` to the live domain too, so
+canonical links and shared-link previews point at one address. See
+[server/README.md](./server/README.md).
+
+The Express server renders each page's `<head>` — title, description,
+Open Graph, JSON-LD — before sending `index.html`, which is what makes links
+preview properly in WhatsApp and Facebook. That only happens when this server
+serves the site, so check SEO tags against `npm start`, not `npm run dev`.
 
 # Docker
 
@@ -44,10 +53,11 @@ docker compose up -d --build  # http://localhost:4000
 | `docker compose up -d --build` | redeploy after code changes |
 
 Content lives in the `rg-data` volume, **not** in the image — rebuilding
-keeps it. Back it up with:
+keeps it. That volume holds `db.json` *and* every image and video uploaded
+from `/admin`, so back up the whole directory:
 
 ```bash
-docker compose cp app:/app/data/db.json ./db-backup.json
+docker compose cp app:/app/data ./rg-data-backup
 ```
 
 To develop inside containers instead (Vite on :3000 with hot reload, API on
