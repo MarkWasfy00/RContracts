@@ -32,11 +32,15 @@ import {
 } from '@/lib/api'
 import {
   categoryLabel,
+  defaultCover,
   projectCategories,
+  projectCover,
+  projectMedia,
 } from '@/lib/site-data'
 import {
   MediaField,
   MediaLibrary,
+  MediaListField,
   MediaPreview,
 } from '@/components/media-field'
 import type { Project, SiteSettings } from '@/lib/site-data'
@@ -368,7 +372,8 @@ function ConnectionStatus() {
 const emptyProjectForm = {
   title: '',
   description: '',
-  image: '',
+  media: [] as Array<string>,
+  cover: '',
   category: projectCategories[0].value as string,
   tags: '',
 }
@@ -379,17 +384,22 @@ function toFormState(project: Project): ProjectFormState {
   return {
     title: project.title,
     description: project.description,
-    image: project.image,
+    media: projectMedia(project),
+    // Blank here means "no cover chosen", which the form fills in on save.
+    cover: project.cover?.trim() ?? '',
     category: project.category,
     tags: project.tags.join('، '),
   }
 }
 
 function fromFormState(form: ProjectFormState): Omit<Project, 'id'> {
+  const media = form.media.map((item) => item.trim()).filter(Boolean)
   return {
     title: form.title.trim(),
     description: form.description.trim(),
-    image: form.image.trim(),
+    media,
+    // Leaving the cover empty is allowed: the first picture stands in.
+    cover: form.cover.trim() || defaultCover(media),
     category: form.category as Project['category'],
     tags: form.tags
       .split(/[,،]/)
@@ -445,12 +455,19 @@ function ProjectsManager() {
       <div className="grid gap-4 sm:grid-cols-2">
         {projects.map((project) => (
           <Card key={project.id} className="gap-0 overflow-hidden py-0">
-            <MediaPreview
-              src={project.image}
-              alt={project.title}
-              controls={false}
-              className="aspect-[16/9] w-full object-cover"
-            />
+            <div className="relative">
+              <MediaPreview
+                src={projectCover(project)}
+                alt={project.title}
+                controls={false}
+                className="aspect-[16/9] w-full object-cover"
+              />
+              {projectMedia(project).length > 1 ? (
+                <span className="absolute end-3 top-3 rounded-full bg-ink/70 px-2.5 py-1 text-xs font-bold text-cream backdrop-blur-sm">
+                  {projectMedia(project).length} ملفات
+                </span>
+              ) : null}
+            </div>
             <CardContent className="space-y-3 py-4">
               <div className="flex items-start justify-between gap-3">
                 <div>
@@ -615,6 +632,10 @@ function ProjectFormFields({
   const set = (patch: Partial<ProjectFormState>) =>
     setForm((f) => ({ ...f, ...patch }))
 
+  // What the project will actually be shown with: the chosen cover, or the
+  // stand-in the save would fall back to.
+  const cover = form.cover.trim() || defaultCover(form.media)
+
   return (
     <form
       className="grid gap-4"
@@ -672,19 +693,58 @@ function ProjectFormFields({
         </div>
       </div>
 
-      <MediaField
-        id="p-image"
-        label="صورة أو فيديو المشروع"
-        required
-        value={form.image}
-        onChange={(image) => set({ image })}
-        hint="ارفع صورة (JPG/PNG/WebP/GIF) أو فيديو (MP4/WebM/MOV) من جهازك، أو حط رابط مباشر."
+      <MediaListField
+        id="p-media"
+        label="صور وفيديوهات المشروع"
+        value={form.media}
+        onChange={(media) => set({ media })}
+        cover={cover}
+        onCoverChange={(next) => set({ cover: next })}
+        hint="ارفع أكتر من صورة (JPG/PNG/WebP/GIF) أو فيديو (MP4/WebM/MOV) مرة واحدة، أو حط روابط مباشرة. الترتيب ده هو اللي هيظهر في صفحة المشروع."
       />
+
+      <Separator />
+
+      <MediaField
+        id="p-cover"
+        label="غلاف المشروع (اختياري)"
+        value={form.cover}
+        onChange={(next) => set({ cover: next })}
+        previewClassName="aspect-[4/5] w-full max-w-[220px] rounded-lg object-cover"
+        hint={
+          form.cover.trim()
+            ? 'ده الغلاف اللي هيظهر في «أعمالنا» وفي لينك المشاركة.'
+            : cover
+              ? 'مفيش غلاف متحدد، فأول صورة في الملفات فوق هي اللي هتتستخدم. تقدر تختار غيرها بزرار النجمة أو ترفع غلاف مستقل هنا.'
+              : 'لو سيبته فاضي هيتاخد أول ملف في المشروع كغلاف.'
+        }
+      />
+
+      {cover ? (
+        <div className="flex items-center gap-3 rounded-lg border bg-muted/30 p-3">
+          <MediaPreview
+            src={cover}
+            controls={false}
+            alt="الغلاف"
+            className="size-14 shrink-0 rounded-md object-cover"
+          />
+          <p className="m-0 text-xs leading-6 text-muted-foreground">
+            الغلاف الحالي{form.cover.trim() ? '' : ' (تلقائي)'}
+          </p>
+        </div>
+      ) : null}
 
       <ErrorNote error={error} />
 
+      {!form.media.length ? (
+        <p className="m-0 flex items-center gap-2 text-xs text-muted-foreground">
+          <AlertCircle className="size-4 shrink-0" />
+          لازم ترفع صورة أو فيديو واحد على الأقل قبل الحفظ.
+        </p>
+      ) : null}
+
       <div className="mt-2 flex gap-2">
-        <Button type="submit" disabled={pending}>
+        <Button type="submit" disabled={pending || !form.media.length}>
           <Save className="size-4" />
           {pending ? 'جارٍ الحفظ…' : 'حفظ المشروع'}
         </Button>

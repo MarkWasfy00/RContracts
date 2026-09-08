@@ -5,8 +5,8 @@ with an admin panel for managing the portfolio and page content.
 
 - `/` — the public site (Arabic, RTL)
 - `/projects/<id>` — each project on its own page, with per-page SEO tags
-- `/admin` — content management: add/edit/delete projects, upload images and
-  videos, edit page copy
+- `/admin` — content management: add/edit/delete projects (several images and
+  videos each, with a chosen cover), upload files, edit page copy
 - `server/` — Express API that stores it all ([details](./server/README.md))
 
 # Getting Started

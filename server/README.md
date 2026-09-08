@@ -69,6 +69,14 @@ Bad payloads return `400` with `{ "error": "..." }`; unknown ids return `404`.
 Request bodies are validated and unknown fields are dropped, so only the
 documented shape is ever stored.
 
+A project holds `media` — an array of up to 30 image and video URLs, in the
+order they appear on its page — and `cover`, the one shown in the portfolio
+grid and in shared links. Sending an empty `cover` is fine: the first still
+image is used, falling back to the first file of any kind. Projects used to
+hold a single `image` instead; a body sending that is still accepted as a
+one-file project, and a `db.json` written before this change is migrated when
+the server loads it.
+
 ## SEO
 
 The site is a single-page app, so a page only exists once JavaScript has run.

@@ -22,6 +22,8 @@ import {
   isVideoSrc,
   phoneTelHref,
   projectCategories,
+  projectCover,
+  projectMedia,
   videoStillSrc,
   whatsappHref,
 } from '@/lib/site-data'
@@ -317,6 +319,9 @@ function Services() {
  * bookmarked, and indexed.
  */
 function ProjectCard({ project }: { project: Project }) {
+  const cover = projectCover(project)
+  const files = projectMedia(project)
+
   return (
     <Link
       to="/projects/$projectId"
@@ -327,9 +332,9 @@ function ProjectCard({ project }: { project: Project }) {
         A video project shows its first frame in the grid — a wall of cards
         all playing at once would fight the page. It plays on its own page.
       */}
-      {isVideoSrc(project.image) ? (
+      {isVideoSrc(cover) ? (
         <video
-          src={videoStillSrc(project.image)}
+          src={videoStillSrc(cover)}
           muted
           playsInline
           preload="metadata"
@@ -338,17 +343,25 @@ function ProjectCard({ project }: { project: Project }) {
         />
       ) : (
         <img
-          src={project.image}
+          src={cover}
           alt={project.title}
           loading="lazy"
           className="aspect-[4/5] w-full object-cover transition-transform duration-500 group-hover:scale-105"
         />
       )}
-      {isVideoSrc(project.image) ? (
-        <span className="absolute end-3 top-3 flex size-9 items-center justify-center rounded-full bg-ink/70 text-cream backdrop-blur-sm">
-          <Play className="size-4 fill-current" />
-        </span>
-      ) : null}
+      <span className="absolute end-3 top-3 flex items-center gap-2">
+        {/* How many more files wait on the project's own page. */}
+        {files.length > 1 ? (
+          <span className="flex h-9 items-center rounded-full bg-ink/70 px-3 text-sm font-bold text-cream backdrop-blur-sm">
+            {files.length}
+          </span>
+        ) : null}
+        {isVideoSrc(cover) || files.some(isVideoSrc) ? (
+          <span className="flex size-9 items-center justify-center rounded-full bg-ink/70 text-cream backdrop-blur-sm">
+            <Play className="size-4 fill-current" />
+          </span>
+        ) : null}
+      </span>
       <div className="absolute inset-0 bg-gradient-to-t from-ink via-ink/30 to-transparent" />
       <div className="absolute inset-x-0 bottom-0 p-5">
         <div className="mb-2 flex flex-wrap gap-1.5">

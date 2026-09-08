@@ -5,6 +5,8 @@ import {
   categoryLabel,
   isVideoSrc,
   phoneTelHref,
+  projectCover,
+  projectMedia,
   videoStillSrc,
   whatsappHref,
 } from '@/lib/site-data'
@@ -99,25 +101,7 @@ function ProjectDetail({ project }: { project: Project }) {
           {project.title}
         </h1>
 
-        <div className="mt-8 overflow-hidden rounded-2xl border">
-          {isVideoSrc(project.image) ? (
-            <video
-              // A visitor who opened this page came for the project itself,
-              // so the video is ready to play rather than autoplaying at them.
-              src={videoStillSrc(project.image)}
-              controls
-              playsInline
-              preload="metadata"
-              className="w-full bg-ink"
-            />
-          ) : (
-            <img
-              src={project.image}
-              alt={project.title}
-              className="w-full object-cover"
-            />
-          )}
-        </div>
+        <ProjectGallery project={project} />
 
         <p className="mt-8 text-base leading-9 text-muted-foreground sm:text-lg">
           {project.description}
@@ -159,6 +143,51 @@ function ProjectDetail({ project }: { project: Project }) {
 
       <RelatedProjects current={project} />
     </>
+  )
+}
+
+/**
+ * Everything the project holds, cover first.
+ *
+ * The cover leads because it is what the visitor clicked on; the rest follow
+ * in the order the admin arranged them. A project with one file looks exactly
+ * as it did before it could hold more.
+ */
+function ProjectGallery({ project }: { project: Project }) {
+  const cover = projectCover(project)
+  const files = projectMedia(project)
+  const ordered = [cover, ...files.filter((file) => file !== cover)]
+
+  return (
+    <div className="mt-8 grid gap-4">
+      {ordered.map((file, index) => (
+        <div key={file} className="overflow-hidden rounded-2xl border">
+          {isVideoSrc(file) ? (
+            <video
+              // A visitor who opened this page came for the project itself,
+              // so the video is ready to play rather than autoplaying at them.
+              src={videoStillSrc(file)}
+              controls
+              playsInline
+              preload="metadata"
+              className="w-full bg-ink"
+            />
+          ) : (
+            <img
+              src={file}
+              alt={
+                index === 0
+                  ? project.title
+                  : `${project.title} — صورة ${index + 1}`
+              }
+              // Only the first one is on screen at load.
+              loading={index === 0 ? 'eager' : 'lazy'}
+              className="w-full object-cover"
+            />
+          )}
+        </div>
+      ))}
+    </div>
   )
 }
 
@@ -223,15 +252,17 @@ function RelatedProjects({ current }: { current: Project }) {
 }
 
 function ProjectTeaser({ project }: { project: Project }) {
+  const cover = projectCover(project)
+
   return (
     <Link
       to="/projects/$projectId"
       params={{ projectId: project.id }}
       className="group relative block overflow-hidden rounded-xl border transition-colors hover:border-primary/60"
     >
-      {isVideoSrc(project.image) ? (
+      {isVideoSrc(cover) ? (
         <video
-          src={videoStillSrc(project.image)}
+          src={videoStillSrc(cover)}
           muted
           playsInline
           preload="metadata"
@@ -240,7 +271,7 @@ function ProjectTeaser({ project }: { project: Project }) {
         />
       ) : (
         <img
-          src={project.image}
+          src={cover}
           alt={project.title}
           loading="lazy"
           className="aspect-[4/3] w-full object-cover transition-transform duration-500 group-hover:scale-105"

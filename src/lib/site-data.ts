@@ -22,10 +22,10 @@ export function categoryLabel(value: string): string {
 /**
  * Whether a stored media path points at a video rather than an image.
  *
- * Projects and settings keep a single URL each, so the renderer works the
- * type out from the extension. Uploads are named by the server with an
- * extension matching the file's real type; a pasted external URL is judged
- * the same way, and anything unrecognised renders as an image.
+ * Nothing records the type alongside the URL, so the renderer works it out
+ * from the extension. Uploads are named by the server with an extension
+ * matching the file's real type; a pasted external URL is judged the same
+ * way, and anything unrecognised renders as an image.
  */
 export function isVideoSrc(src: string): boolean {
   return /\.(mp4|webm|mov|m4v|ogv)(\?|#|$)/i.test(src.trim())
@@ -44,11 +44,48 @@ export function videoStillSrc(src: string): string {
 
 export interface Project {
   id: string
-  image: string
+  /** Every image and video in the project's gallery, in display order. */
+  media: Array<string>
+  /** The one shown in cards and shared links. Never empty once stored. */
+  cover: string
   title: string
   description: string
   category: ProjectCategory
   tags: Array<string>
+  /** Older projects held a single file here. Read through `projectMedia`. */
+  image?: string
+}
+
+/** Shown when a project somehow has no files at all. */
+export const fallbackCover = '/media/post1.png'
+
+/**
+ * The cover to use when none was chosen: the first still image, falling back
+ * to the first file of any kind. An image is preferred because a card and a
+ * shared link can't render a frame out of a video on their own.
+ */
+export function defaultCover(media: Array<string>): string {
+  return media.find((item) => !isVideoSrc(item)) ?? media[0] ?? ''
+}
+
+/**
+ * A project's gallery. The server migrates the older single-`image` shape on
+ * load, so this only matters for the defaults bundled with the client and for
+ * a project being edited in the admin form.
+ */
+export function projectMedia(project: Project): Array<string> {
+  if (project.media?.length) return project.media
+  const legacy = project.image?.trim()
+  return legacy ? [legacy] : []
+}
+
+/** What to show for a project in a card, a teaser, or a preview. */
+export function projectCover(project: Project): string {
+  return (
+    project.cover?.trim() ||
+    defaultCover(projectMedia(project)) ||
+    fallbackCover
+  )
 }
 
 export interface SiteSettings {
@@ -86,7 +123,8 @@ export function whatsappHref(settings: SiteSettings): string {
 export const defaultProjects: Array<Project> = [
   {
     id: 'default-kitchen',
-    image: '/media/post3.png',
+    media: ['/media/post3.png'],
+    cover: '/media/post3.png',
     title: 'مطبخ مودرن — تشطيب كامل',
     description:
       'تشطيب مطبخ متكامل: خزائن حتى السقف، أسطح رخام، وكرانيش إضاءة مخفية مع تسليم كامل للأجهزة.',
@@ -95,7 +133,8 @@ export const defaultProjects: Array<Project> = [
   },
   {
     id: 'default-living',
-    image: '/media/post1.png',
+    media: ['/media/post1.png'],
+    cover: '/media/post1.png',
     title: 'غرفة معيشة عملية',
     description:
       'استغلال ذكي للمساحة بدواليب حائط ووحدات تخزين مدمجة مع الحفاظ على الإضاءة الطبيعية.',
@@ -104,7 +143,8 @@ export const defaultProjects: Array<Project> = [
   },
   {
     id: 'default-renew',
-    image: '/media/post2.png',
+    media: ['/media/post2.png'],
+    cover: '/media/post2.png',
     title: 'تجديد مساحة معيشة',
     description:
       'تجديد ديكور بلمسات معدنية نحاسية، مرايا لإضافة عمق، ونباتات طبيعية تضفي حياة على المكان.',

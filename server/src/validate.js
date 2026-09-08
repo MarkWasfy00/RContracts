@@ -1,4 +1,5 @@
 import { defaultSettings, projectCategories } from './defaults.js'
+import { MAX_MEDIA, cleanMediaList, defaultCover } from './project-media.js'
 
 /** Thrown when a request body doesn't match the expected shape. */
 export class ValidationError extends Error {
@@ -60,10 +61,48 @@ export function parseProject(body) {
   return {
     title: requireString(body.title, 'title', { max: 200 }),
     description: requireString(body.description, 'description'),
-    image: requireString(body.image, 'image', { max: 500 }),
+    ...parseMedia(body),
     category,
     tags,
   }
+}
+
+/**
+ * The files of one project: the gallery plus the cover.
+ *
+ * A body from an older client sends a single `image` instead, so that is
+ * accepted as a one-file gallery. An empty cover is filled in here rather
+ * than left to whatever renders the project, so every stored project has
+ * one.
+ */
+function parseMedia(body) {
+  let media = []
+  if (body.media !== undefined && body.media !== null) {
+    if (!Array.isArray(body.media)) {
+      throw new ValidationError('"media" must be an array of strings')
+    }
+    if (body.media.length > MAX_MEDIA) {
+      throw new ValidationError(`"media" must hold at most ${MAX_MEDIA} files`)
+    }
+    media = cleanMediaList(
+      body.media.map((item, index) =>
+        requireString(item, `media[${index}]`, { max: 500, allowEmpty: true }),
+      ),
+    )
+  }
+
+  if (!media.length && body.image !== undefined) {
+    media = cleanMediaList([
+      requireString(body.image, 'image', { max: 500, allowEmpty: true }),
+    ])
+  }
+
+  if (!media.length) {
+    throw new ValidationError('"media" must contain at least one file')
+  }
+
+  const cover = optionalString(body.cover, 'cover', '', { max: 500 })
+  return { media, cover: cover || defaultCover(media) }
 }
 
 /**

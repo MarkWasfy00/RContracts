@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
+import { defaultCover } from './project-media.js'
 import { getSettings, listProjects } from './store.js'
 
 /**
@@ -131,17 +132,25 @@ export function metaForPath(pathname, base) {
     if (!project) return null
 
     const url = `${base}${projectPath(project.id)}`
-    const media = absolute(base, project.image)
-    const projectIsVideo = isVideo(project.image)
+    const files = Array.isArray(project.media) ? project.media : []
+    const cover = project.cover || defaultCover(files)
+    // A video has no still to preview with, so a shared card prefers a
+    // picture: the cover when it is one, otherwise the first one in the
+    // gallery, and the site image when the project is video only.
+    // The cover leads, then the rest of the gallery — it is usually one of
+    // the files, so the list is de-duplicated.
+    const stills = [...new Set([cover, ...files])]
+      .filter((file) => file && !isVideo(file))
+      .map((file) => absolute(base, file))
+    const video = [cover, ...files].find((file) => file && isVideo(file)) ?? ''
+    const videoUrl = video ? absolute(base, video) : ''
 
     return {
       title: `${project.title} | ${SITE_NAME}`,
       description: truncate(project.description),
       canonical: url,
-      // A video has no still to preview with, so the shared card falls back
-      // to the site image and the video is offered alongside it.
-      image: projectIsVideo ? siteImage : media,
-      video: projectIsVideo ? media : '',
+      image: stills[0] ?? siteImage,
+      video: videoUrl,
       type: 'article',
       jsonLd: [
         organisation,
@@ -151,7 +160,9 @@ export function metaForPath(pathname, base) {
           name: project.title,
           description: project.description,
           url,
-          [projectIsVideo ? 'video' : 'image']: media,
+          // Every picture in the gallery, so a rich result can pick one.
+          ...(stills.length ? { image: stills } : {}),
+          ...(videoUrl ? { video: videoUrl } : {}),
           keywords: project.tags.join(', '),
           creator: { '@id': `${base}/#business` },
         },

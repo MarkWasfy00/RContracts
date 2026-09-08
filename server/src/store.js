@@ -2,6 +2,7 @@ import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 
 import { defaultProjects, defaultSettings } from './defaults.js'
+import { normaliseProject } from './project-media.js'
 
 export const DATA_DIR = resolve(
   process.env.DATA_DIR ?? join(process.cwd(), 'data'),
@@ -39,13 +40,17 @@ export async function initStore() {
     const raw = await readFile(DB_FILE, 'utf8')
     const parsed = JSON.parse(raw)
     db = {
+      // Projects saved before they could hold more than one file still carry
+      // a single `image`; migrating on load keeps that out of every reader.
       projects: Array.isArray(parsed.projects)
-        ? parsed.projects
+        ? parsed.projects.map(normaliseProject).filter(Boolean)
         : structuredClone(defaultProjects),
       // Spread over defaults so a database written before a new setting
       // was added still resolves that setting to a usable value.
       settings: { ...defaultSettings, ...(parsed.settings ?? {}) },
     }
+    // Persist the migration now, so the file on disk matches what is served.
+    await persist()
     return { seeded: false, file: DB_FILE }
   } catch (error) {
     if (error.code !== 'ENOENT') throw error

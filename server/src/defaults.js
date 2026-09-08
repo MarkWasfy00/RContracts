@@ -17,7 +17,8 @@ export const projectCategories = [
 export const defaultProjects = [
   {
     id: 'default-kitchen',
-    image: '/media/post3.png',
+    media: ['/media/post3.png'],
+    cover: '/media/post3.png',
     title: 'مطبخ مودرن — تشطيب كامل',
     description:
       'تشطيب مطبخ متكامل: خزائن حتى السقف، أسطح رخام، وكرانيش إضاءة مخفية مع تسليم كامل للأجهزة.',
@@ -26,7 +27,8 @@ export const defaultProjects = [
   },
   {
     id: 'default-living',
-    image: '/media/post1.png',
+    media: ['/media/post1.png'],
+    cover: '/media/post1.png',
     title: 'غرفة معيشة عملية',
     description:
       'استغلال ذكي للمساحة بدواليب حائط ووحدات تخزين مدمجة مع الحفاظ على الإضاءة الطبيعية.',
@@ -35,7 +37,8 @@ export const defaultProjects = [
   },
   {
     id: 'default-renew',
-    image: '/media/post2.png',
+    media: ['/media/post2.png'],
+    cover: '/media/post2.png',
     title: 'تجديد مساحة معيشة',
     description:
       'تجديد ديكور بلمسات معدنية نحاسية، مرايا لإضافة عمق، ونباتات طبيعية تضفي حياة على المكان.',
